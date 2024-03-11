@@ -1,0 +1,2121 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 0,
+   "metadata": {
+    "application/vnd.databricks.v1+cell": {
+     "cellMetadata": {
+      "byteLimit": 2048000,
+      "rowLimit": 10000
+     },
+     "inputWidgets": {},
+     "nuid": "9e633aec-ace1-45d3-81ba-0dffb287f4df",
+     "showTitle": false,
+     "title": ""
+    }
+   },
+   "outputs": [],
+   "source": [
+    "#Source Datasets:\n",
+    "#Order.json=https://easyupload.io/bft757\n",
+    "#Customer.xlsx= https://easyupload.io/fmrx1r\n",
+    "#Product.csv=https://easyupload.io/9ihgl1"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 0,
+   "metadata": {
+    "application/vnd.databricks.v1+cell": {
+     "cellMetadata": {
+      "byteLimit": 2048000,
+      "rowLimit": 10000
+     },
+     "inputWidgets": {},
+     "nuid": "46465351-c721-4e33-a199-04cfe0f5e936",
+     "showTitle": false,
+     "title": ""
+    }
+   },
+   "outputs": [],
+   "source": [
+    "\n",
+    "from pyspark.sql import SparkSession\n",
+    "from pyspark.sql.functions import *\n",
+    "spark = SparkSession.builder \\\n",
+    "  .appName(\"Customer_product_App\") \\\n",
+    "  .config(\"spark.jars.packages\", \"com.crealytics:spark-excel_2.12:3.5.0_0.20.3\").getOrCreate() \n",
+    "order_cols=['CustomerID',\n",
+    " 'Discount',\n",
+    " 'OrderDate',\n",
+    " 'OrderID',\n",
+    " 'Price',\n",
+    " 'ProductID',\n",
+    " 'Profit',\n",
+    " 'Quantity',\n",
+    " 'RowID',\n",
+    " 'ShipDate',\n",
+    " 'ShipMode']\n",
+    "df_order=spark.read.option(\"multiline\",\"true\").option('inferschema','true').json(\"/FileStore/tables/Order.json\").toDF(*order_cols)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 0,
+   "metadata": {
+    "application/vnd.databricks.v1+cell": {
+     "cellMetadata": {
+      "byteLimit": 2048000,
+      "rowLimit": 10000
+     },
+     "inputWidgets": {},
+     "nuid": "84a85f72-8fbf-4e23-a2f8-2d593d263744",
+     "showTitle": false,
+     "title": ""
+    }
+   },
+   "outputs": [
+    {
+     "output_type": "stream",
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "root\n |-- CustomerID: string (nullable = true)\n |-- Discount: double (nullable = true)\n |-- OrderDate: string (nullable = true)\n |-- OrderID: string (nullable = true)\n |-- Price: string (nullable = true)\n |-- ProductID: string (nullable = true)\n |-- Profit: double (nullable = true)\n |-- Quantity: long (nullable = true)\n |-- RowID: long (nullable = true)\n |-- ShipDate: string (nullable = true)\n |-- ShipMode: string (nullable = true)\n\n"
+     ]
+    }
+   ],
+   "source": [
+    "df_order.printSchema()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 0,
+   "metadata": {
+    "application/vnd.databricks.v1+cell": {
+     "cellMetadata": {
+      "byteLimit": 2048000,
+      "rowLimit": 10000
+     },
+     "inputWidgets": {},
+     "nuid": "a948b747-cc34-4632-9a7d-ef8f97a25bcc",
+     "showTitle": false,
+     "title": ""
+    }
+   },
+   "outputs": [],
+   "source": [
+    "df_order=df_order.withColumn('OrderDate',date_format(to_date('OrderDate',\"d/M/yyyy\"), \"yyyy-MM-dd\"))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 0,
+   "metadata": {
+    "application/vnd.databricks.v1+cell": {
+     "cellMetadata": {
+      "byteLimit": 2048000,
+      "rowLimit": 10000
+     },
+     "inputWidgets": {},
+     "nuid": "5af8b482-ac07-49e3-934f-55544753f71e",
+     "showTitle": false,
+     "title": ""
+    }
+   },
+   "outputs": [
+    {
+     "output_type": "stream",
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "+----------+--------+----------+--------------+-------+---------------+-------+--------+-----+---------+--------------+\n|CustomerID|Discount| OrderDate|       OrderID|  Price|      ProductID| Profit|Quantity|RowID| ShipDate|      ShipMode|\n+----------+--------+----------+--------------+-------+---------------+-------+--------+-----+---------+--------------+\n|  JK-15370|     0.3|2016-08-21|CA-2016-122581|573.174|FUR-CH-10002961| 63.686|       7|    1|25/8/2016|Standard Class|\n|  BD-11320|     0.0|2017-09-23|CA-2017-117485| 291.96|TEC-AC-10004659|102.186|       4|    2|29/9/2017|Standard Class|\n|  LB-16795|     0.7|2016-10-06|US-2016-157490|     17|OFF-BI-10002824| -14.92|       4|    3|7/10/2016|   First Class|\n+----------+--------+----------+--------------+-------+---------------+-------+--------+-----+---------+--------------+\nonly showing top 3 rows\n\n"
+     ]
+    }
+   ],
+   "source": [
+    "df_order.show(3)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 0,
+   "metadata": {
+    "application/vnd.databricks.v1+cell": {
+     "cellMetadata": {
+      "byteLimit": 2048000,
+      "rowLimit": 10000
+     },
+     "inputWidgets": {},
+     "nuid": "7a25559f-d85c-40af-b8f0-0ebb3621bbd1",
+     "showTitle": false,
+     "title": ""
+    }
+   },
+   "outputs": [
+    {
+     "output_type": "stream",
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "+----------+\n| OrderDate|\n+----------+\n|2017-09-23|\n|2016-10-06|\n|2016-08-21|\n+----------+\nonly showing top 3 rows\n\n"
+     ]
+    }
+   ],
+   "source": [
+    "df_order.select(\"OrderDate\").distinct().show(3)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 0,
+   "metadata": {
+    "application/vnd.databricks.v1+cell": {
+     "cellMetadata": {
+      "byteLimit": 2048000,
+      "rowLimit": 10000
+     },
+     "inputWidgets": {},
+     "nuid": "ab1ed79e-0be2-48d1-a33b-65e9c2e37f67",
+     "showTitle": false,
+     "title": ""
+    }
+   },
+   "outputs": [],
+   "source": [
+    "\n",
+    "customer_cols=['CustomerID',\n",
+    " 'CustomerName',\n",
+    " 'email',\n",
+    " 'phone',\n",
+    " 'address',\n",
+    " 'Segment',\n",
+    " 'Country',\n",
+    " 'City',\n",
+    " 'State',\n",
+    " 'PostalCode',\n",
+    " 'Region']\n",
+    "df_customer = spark.read.format(\"com.crealytics.spark.excel\")\\\n",
+    "  .option(\"header\", \"true\") \\\n",
+    "  .option(\"inferSchema\", \"true\")\\\n",
+    "  .load(\"/FileStore/tables/Customer.xlsx\").toDF(*customer_cols)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 0,
+   "metadata": {
+    "application/vnd.databricks.v1+cell": {
+     "cellMetadata": {
+      "byteLimit": 2048000,
+      "rowLimit": 10000
+     },
+     "inputWidgets": {},
+     "nuid": "d191db4d-ff0d-4b0a-905d-4383c69cf4c9",
+     "showTitle": false,
+     "title": ""
+    }
+   },
+   "outputs": [],
+   "source": [
+    "df_customer=df_customer.withColumn('CustomerName',regexp_replace(trim(col('CustomerName')),  \"[^a-zA-Z' ]\",  \"\"))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 0,
+   "metadata": {
+    "application/vnd.databricks.v1+cell": {
+     "cellMetadata": {
+      "byteLimit": 2048000,
+      "rowLimit": 10000
+     },
+     "inputWidgets": {},
+     "nuid": "03f6851b-3bb9-4c8f-bd1a-cccadc8e82d9",
+     "showTitle": false,
+     "title": ""
+    }
+   },
+   "outputs": [
+    {
+     "output_type": "stream",
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "+------------------+\n|CustomerName      |\n+------------------+\n|Rob Lucas         |\n|Sung Pak          |\n|Ann Blume         |\n|Sally Knutson     |\n|Aaron Bergman     |\n|Craig Reiter      |\n|Matt Collins      |\n|Sonia Sunley      |\n|Lauren Leatherbury|\n|Allen Rosenblatt  |\n+------------------+\nonly showing top 10 rows\n\n"
+     ]
+    }
+   ],
+   "source": [
+    "df_customer.select('CustomerName').distinct().show(10,truncate=False)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 0,
+   "metadata": {
+    "application/vnd.databricks.v1+cell": {
+     "cellMetadata": {
+      "byteLimit": 2048000,
+      "rowLimit": 10000
+     },
+     "inputWidgets": {},
+     "nuid": "b4150602-7598-4b20-9d0c-df08968a15e4",
+     "showTitle": false,
+     "title": ""
+    }
+   },
+   "outputs": [
+    {
+     "output_type": "stream",
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "root\n |-- CustomerID: string (nullable = true)\n |-- CustomerName: string (nullable = true)\n |-- email: string (nullable = true)\n |-- phone: string (nullable = true)\n |-- address: string (nullable = true)\n |-- Segment: string (nullable = true)\n |-- Country: string (nullable = true)\n |-- City: string (nullable = true)\n |-- State: string (nullable = true)\n |-- PostalCode: double (nullable = true)\n |-- Region: string (nullable = true)\n\n"
+     ]
+    }
+   ],
+   "source": [
+    "df_customer.printSchema()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 0,
+   "metadata": {
+    "application/vnd.databricks.v1+cell": {
+     "cellMetadata": {
+      "byteLimit": 2048000,
+      "rowLimit": 10000
+     },
+     "inputWidgets": {},
+     "nuid": "f9bd85bc-313c-40a6-b5db-333b9819ba1f",
+     "showTitle": false,
+     "title": ""
+    }
+   },
+   "outputs": [
+    {
+     "output_type": "stream",
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "+----------+-------------+---------------------------+--------------------+-------------------------------------------------+-----------+-------------+----------------+--------+----------+-------+\n|CustomerID|CustomerName |email                      |phone               |address                                          |Segment    |Country      |City            |State   |PostalCode|Region |\n+----------+-------------+---------------------------+--------------------+-------------------------------------------------+-----------+-------------+----------------+--------+----------+-------+\n|PW-19240  |Pierre Wener |bettysullivan808@gmail.com |421.580.0902x9815   |001 Jones Ridges Suite 338\\nJohnsonfort, FL 95462|Consumer   |United States|Louisville      |Colorado|80027.0   |West   |\n|GH-14410  |Gary Hansen  |austindyer948@gmail.com    |001-542-415-0246x314|00347 Murphy Unions\\nAshleyton, IA 29814         |Home Office|United States|Chicago         |Illinois|60653.0   |Central|\n|KL-16555  |Kelly Lampkin|clarencehughes280@gmail.com|7185624866          |007 Adams Lane Suite 176\\nEast Amyberg, IN 34581 |Corporate  |United States|Colorado Springs|Colorado|80906.0   |West   |\n+----------+-------------+---------------------------+--------------------+-------------------------------------------------+-----------+-------------+----------------+--------+----------+-------+\nonly showing top 3 rows\n\n"
+     ]
+    }
+   ],
+   "source": [
+    "df_customer.show(3,truncate=False)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 0,
+   "metadata": {
+    "application/vnd.databricks.v1+cell": {
+     "cellMetadata": {
+      "byteLimit": 2048000,
+      "rowLimit": 10000
+     },
+     "inputWidgets": {},
+     "nuid": "48f92dbf-6ca4-4ca5-9b2a-bf48dbfd999b",
+     "showTitle": false,
+     "title": ""
+    }
+   },
+   "outputs": [
+    {
+     "output_type": "execute_result",
+     "data": {
+      "text/plain": [
+       "['ProductID',\n",
+       " 'Category',\n",
+       " 'Sub-Category',\n",
+       " 'ProductName',\n",
+       " 'State',\n",
+       " 'Price_per_product']"
+      ]
+     },
+     "execution_count": 258,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "df_product.columns"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 0,
+   "metadata": {
+    "application/vnd.databricks.v1+cell": {
+     "cellMetadata": {
+      "byteLimit": 2048000,
+      "rowLimit": 10000
+     },
+     "inputWidgets": {},
+     "nuid": "f46259c4-f7f9-4faa-ba8d-bf8a986fa36f",
+     "showTitle": false,
+     "title": ""
+    }
+   },
+   "outputs": [],
+   "source": [
+    "prodcut_cols=['ProductID',\n",
+    " 'Category',\n",
+    " 'Sub-Category',\n",
+    " 'ProductName',\n",
+    " 'State',\n",
+    " 'Price_per_product']\n",
+    "df_product=spark.read.option(\"header\",\"true\").option('inferschema','true').csv(\"/FileStore/tables/Product.csv\").toDF(*prodcut_cols)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 0,
+   "metadata": {
+    "application/vnd.databricks.v1+cell": {
+     "cellMetadata": {
+      "byteLimit": 2048000,
+      "rowLimit": 10000
+     },
+     "inputWidgets": {},
+     "nuid": "febeeea7-544c-415b-8655-9bda31511879",
+     "showTitle": false,
+     "title": ""
+    }
+   },
+   "outputs": [
+    {
+     "output_type": "stream",
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "+---------------+---------------+------------+--------------------+--------+-----------------+\n|      ProductID|       Category|Sub-Category|         ProductName|   State|Price_per_product|\n+---------------+---------------+------------+--------------------+--------+-----------------+\n|FUR-CH-10002961|      Furniture|      Chairs|Leather Task Chai...|New York|           81.882|\n|TEC-AC-10004659|     Technology| Accessories|Imation Secure+ H...|Oklahoma|            72.99|\n|OFF-BI-10002824|Office Supplies|     Binders|Recycled Easel Ri...|Colorado|             4.25|\n+---------------+---------------+------------+--------------------+--------+-----------------+\nonly showing top 3 rows\n\n"
+     ]
+    }
+   ],
+   "source": [
+    "df_product.show(3)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 0,
+   "metadata": {
+    "application/vnd.databricks.v1+cell": {
+     "cellMetadata": {
+      "byteLimit": 2048000,
+      "implicitDf": true,
+      "rowLimit": 10000
+     },
+     "inputWidgets": {},
+     "nuid": "25971f7e-dde1-44b0-b27d-510c925c40e6",
+     "showTitle": false,
+     "title": ""
+    }
+   },
+   "outputs": [],
+   "source": [
+    "%sql\n",
+    "--create schema PEI\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 0,
+   "metadata": {
+    "application/vnd.databricks.v1+cell": {
+     "cellMetadata": {
+      "byteLimit": 2048000,
+      "rowLimit": 10000
+     },
+     "inputWidgets": {},
+     "nuid": "37065fb6-178e-4407-ac54-08819d43b30f",
+     "showTitle": false,
+     "title": ""
+    }
+   },
+   "outputs": [],
+   "source": [
+    "df_order.write.saveAsTable('PEI.Raw_Order')\n",
+    "df_customer.write.saveAsTable('PEI.Raw_customer')\n",
+    "df_product.write.saveAsTable('PEI.Raw_product')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 0,
+   "metadata": {
+    "application/vnd.databricks.v1+cell": {
+     "cellMetadata": {
+      "byteLimit": 2048000,
+      "implicitDf": true,
+      "rowLimit": 10000
+     },
+     "inputWidgets": {},
+     "nuid": "b415dcdc-7ad8-47a5-b009-ed58b1cc0fb7",
+     "showTitle": false,
+     "title": ""
+    }
+   },
+   "outputs": [
+    {
+     "output_type": "display_data",
+     "data": {
+      "text/html": [
+       "<style scoped>\n",
+       "  .table-result-container {\n",
+       "    max-height: 300px;\n",
+       "    overflow: auto;\n",
+       "  }\n",
+       "  table, th, td {\n",
+       "    border: 1px solid black;\n",
+       "    border-collapse: collapse;\n",
+       "  }\n",
+       "  th, td {\n",
+       "    padding: 5px;\n",
+       "  }\n",
+       "  th {\n",
+       "    text-align: left;\n",
+       "  }\n",
+       "</style><div class='table-result-container'><table class='table-result'><thead style='background-color: white'><tr><th>CustomerID</th><th>Discount</th><th>OrderDate</th><th>OrderID</th><th>Price</th><th>ProductID</th><th>Profit</th><th>Quantity</th><th>RowID</th><th>ShipDate</th><th>ShipMode</th></tr></thead><tbody><tr><td>JK-15370</td><td>0.3</td><td>2016-08-21</td><td>CA-2016-122581</td><td>573.174</td><td>FUR-CH-10002961</td><td>63.686</td><td>7</td><td>1</td><td>25/8/2016</td><td>Standard Class</td></tr><tr><td>BD-11320</td><td>0.0</td><td>2017-09-23</td><td>CA-2017-117485</td><td>291.96</td><td>TEC-AC-10004659</td><td>102.186</td><td>4</td><td>2</td><td>29/9/2017</td><td>Standard Class</td></tr><tr><td>LB-16795</td><td>0.7</td><td>2016-10-06</td><td>US-2016-157490</td><td>17</td><td>OFF-BI-10002824</td><td>-14.92</td><td>4</td><td>3</td><td>7/10/2016</td><td>First Class</td></tr><tr><td>KB-16315</td><td>0.2</td><td>2015-07-02</td><td>CA-2015-111703</td><td>15.552</td><td>OFF-PA-10003349</td><td>5.6376</td><td>3</td><td>4</td><td>9/7/2015</td><td>Standard Class</td></tr><tr><td>DO-13435</td><td>0.2</td><td>2014-10-03</td><td>CA-2014-108903</td><td>142.488</td><td>TEC-AC-10003023</td><td>-3.0</td><td>3</td><td>5</td><td>3/10/2014</td><td>Same Day</td></tr></tbody></table></div>"
+      ]
+     },
+     "metadata": {
+      "application/vnd.databricks.v1+output": {
+       "addedWidgets": {},
+       "aggData": [],
+       "aggError": "",
+       "aggOverflow": false,
+       "aggSchema": [],
+       "aggSeriesLimitReached": false,
+       "aggType": "",
+       "arguments": {},
+       "columnCustomDisplayInfos": {},
+       "data": [
+        [
+         "JK-15370",
+         0.3,
+         "2016-08-21",
+         "CA-2016-122581",
+         "573.174",
+         "FUR-CH-10002961",
+         63.686,
+         7,
+         1,
+         "25/8/2016",
+         "Standard Class"
+        ],
+        [
+         "BD-11320",
+         0.0,
+         "2017-09-23",
+         "CA-2017-117485",
+         "291.96",
+         "TEC-AC-10004659",
+         102.186,
+         4,
+         2,
+         "29/9/2017",
+         "Standard Class"
+        ],
+        [
+         "LB-16795",
+         0.7,
+         "2016-10-06",
+         "US-2016-157490",
+         "17",
+         "OFF-BI-10002824",
+         -14.92,
+         4,
+         3,
+         "7/10/2016",
+         "First Class"
+        ],
+        [
+         "KB-16315",
+         0.2,
+         "2015-07-02",
+         "CA-2015-111703",
+         "15.552",
+         "OFF-PA-10003349",
+         5.6376,
+         3,
+         4,
+         "9/7/2015",
+         "Standard Class"
+        ],
+        [
+         "DO-13435",
+         0.2,
+         "2014-10-03",
+         "CA-2014-108903",
+         "142.488",
+         "TEC-AC-10003023",
+         -3.0,
+         3,
+         5,
+         "3/10/2014",
+         "Same Day"
+        ]
+       ],
+       "datasetInfos": [],
+       "dbfsResultPath": null,
+       "isJsonSchema": true,
+       "metadata": {
+        "dataframeName": "_sqldf",
+        "executionCount": 346
+       },
+       "overflow": false,
+       "plotOptions": {
+        "customPlotOptions": {},
+        "displayType": "table",
+        "pivotAggregation": null,
+        "pivotColumns": null,
+        "xColumns": null,
+        "yColumns": null
+       },
+       "removedWidgets": [],
+       "schema": [
+        {
+         "metadata": "{}",
+         "name": "CustomerID",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "Discount",
+         "type": "\"double\""
+        },
+        {
+         "metadata": "{}",
+         "name": "OrderDate",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "OrderID",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "Price",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "ProductID",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "Profit",
+         "type": "\"double\""
+        },
+        {
+         "metadata": "{}",
+         "name": "Quantity",
+         "type": "\"long\""
+        },
+        {
+         "metadata": "{}",
+         "name": "RowID",
+         "type": "\"long\""
+        },
+        {
+         "metadata": "{}",
+         "name": "ShipDate",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "ShipMode",
+         "type": "\"string\""
+        }
+       ],
+       "type": "table"
+      }
+     },
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "%sql\n",
+    "\n",
+    "select *  from pei.Raw_Order limit 5"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 0,
+   "metadata": {
+    "application/vnd.databricks.v1+cell": {
+     "cellMetadata": {
+      "byteLimit": 2048000,
+      "implicitDf": true,
+      "rowLimit": 10000
+     },
+     "inputWidgets": {},
+     "nuid": "0a16dd74-5a15-498c-9e1c-797af09f46c3",
+     "showTitle": false,
+     "title": ""
+    }
+   },
+   "outputs": [
+    {
+     "output_type": "display_data",
+     "data": {
+      "text/html": [
+       "<style scoped>\n",
+       "  .table-result-container {\n",
+       "    max-height: 300px;\n",
+       "    overflow: auto;\n",
+       "  }\n",
+       "  table, th, td {\n",
+       "    border: 1px solid black;\n",
+       "    border-collapse: collapse;\n",
+       "  }\n",
+       "  th, td {\n",
+       "    padding: 5px;\n",
+       "  }\n",
+       "  th {\n",
+       "    text-align: left;\n",
+       "  }\n",
+       "</style><div class='table-result-container'><table class='table-result'><thead style='background-color: white'><tr><th>CustomerID</th><th>CustomerName</th><th>email</th><th>phone</th><th>address</th><th>Segment</th><th>Country</th><th>City</th><th>State</th><th>PostalCode</th><th>Region</th></tr></thead><tbody><tr><td>PW-19240</td><td>Pierre Wener</td><td>bettysullivan808@gmail.com</td><td>421.580.0902x9815</td><td>001 Jones Ridges Suite 338\n",
+       "Johnsonfort, FL 95462</td><td>Consumer</td><td>United States</td><td>Louisville</td><td>Colorado</td><td>80027.0</td><td>West</td></tr><tr><td>GH-14410</td><td>Gary Hansen</td><td>austindyer948@gmail.com</td><td>001-542-415-0246x314</td><td>00347 Murphy Unions\n",
+       "Ashleyton, IA 29814</td><td>Home Office</td><td>United States</td><td>Chicago</td><td>Illinois</td><td>60653.0</td><td>Central</td></tr><tr><td>KL-16555</td><td>Kelly Lampkin</td><td>clarencehughes280@gmail.com</td><td>7185624866</td><td>007 Adams Lane Suite 176\n",
+       "East Amyberg, IN 34581</td><td>Corporate</td><td>United States</td><td>Colorado Springs</td><td>Colorado</td><td>80906.0</td><td>West</td></tr><tr><td>AH-10075</td><td>Ad       am Hart</td><td>angelabryant256@gmail.com</td><td>265.101.5569x1098</td><td>01454 Christopher Turnpike\n",
+       "North Ryanstad, MI 36226</td><td>Corporate</td><td>United States</td><td>Columbus</td><td>Ohio</td><td>43229.0</td><td>East</td></tr><tr><td>PF-19165</td><td>Philip Fox</td><td>kristinereynolds576@gmail.com</td><td>001-473-645-2141x9154</td><td>0158 Harris Ways Suite 085\n",
+       "East Laceyside, SD 35649</td><td>Consumer</td><td>United States</td><td>San Diego</td><td>California</td><td>92105.0</td><td>West</td></tr></tbody></table></div>"
+      ]
+     },
+     "metadata": {
+      "application/vnd.databricks.v1+output": {
+       "addedWidgets": {},
+       "aggData": [],
+       "aggError": "",
+       "aggOverflow": false,
+       "aggSchema": [],
+       "aggSeriesLimitReached": false,
+       "aggType": "",
+       "arguments": {},
+       "columnCustomDisplayInfos": {},
+       "data": [
+        [
+         "PW-19240",
+         "Pierre Wener",
+         "bettysullivan808@gmail.com",
+         "421.580.0902x9815",
+         "001 Jones Ridges Suite 338\nJohnsonfort, FL 95462",
+         "Consumer",
+         "United States",
+         "Louisville",
+         "Colorado",
+         80027.0,
+         "West"
+        ],
+        [
+         "GH-14410",
+         "Gary Hansen",
+         "austindyer948@gmail.com",
+         "001-542-415-0246x314",
+         "00347 Murphy Unions\nAshleyton, IA 29814",
+         "Home Office",
+         "United States",
+         "Chicago",
+         "Illinois",
+         60653.0,
+         "Central"
+        ],
+        [
+         "KL-16555",
+         "Kelly Lampkin",
+         "clarencehughes280@gmail.com",
+         "7185624866",
+         "007 Adams Lane Suite 176\nEast Amyberg, IN 34581",
+         "Corporate",
+         "United States",
+         "Colorado Springs",
+         "Colorado",
+         80906.0,
+         "West"
+        ],
+        [
+         "AH-10075",
+         "Ad       am Hart",
+         "angelabryant256@gmail.com",
+         "265.101.5569x1098",
+         "01454 Christopher Turnpike\nNorth Ryanstad, MI 36226",
+         "Corporate",
+         "United States",
+         "Columbus",
+         "Ohio",
+         43229.0,
+         "East"
+        ],
+        [
+         "PF-19165",
+         "Philip Fox",
+         "kristinereynolds576@gmail.com",
+         "001-473-645-2141x9154",
+         "0158 Harris Ways Suite 085\nEast Laceyside, SD 35649",
+         "Consumer",
+         "United States",
+         "San Diego",
+         "California",
+         92105.0,
+         "West"
+        ]
+       ],
+       "datasetInfos": [],
+       "dbfsResultPath": null,
+       "isJsonSchema": true,
+       "metadata": {
+        "dataframeName": "_sqldf",
+        "executionCount": 347
+       },
+       "overflow": false,
+       "plotOptions": {
+        "customPlotOptions": {},
+        "displayType": "table",
+        "pivotAggregation": null,
+        "pivotColumns": null,
+        "xColumns": null,
+        "yColumns": null
+       },
+       "removedWidgets": [],
+       "schema": [
+        {
+         "metadata": "{}",
+         "name": "CustomerID",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "CustomerName",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "email",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "phone",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "address",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "Segment",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "Country",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "City",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "State",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "PostalCode",
+         "type": "\"double\""
+        },
+        {
+         "metadata": "{}",
+         "name": "Region",
+         "type": "\"string\""
+        }
+       ],
+       "type": "table"
+      }
+     },
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "%sql\n",
+    "select * from pei.Raw_customer limit 5"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 0,
+   "metadata": {
+    "application/vnd.databricks.v1+cell": {
+     "cellMetadata": {
+      "byteLimit": 2048000,
+      "implicitDf": true,
+      "rowLimit": 10000
+     },
+     "inputWidgets": {},
+     "nuid": "5377c8e8-b0a7-4eea-b034-a92f24c71a68",
+     "showTitle": false,
+     "title": ""
+    }
+   },
+   "outputs": [
+    {
+     "output_type": "display_data",
+     "data": {
+      "text/html": [
+       "<style scoped>\n",
+       "  .table-result-container {\n",
+       "    max-height: 300px;\n",
+       "    overflow: auto;\n",
+       "  }\n",
+       "  table, th, td {\n",
+       "    border: 1px solid black;\n",
+       "    border-collapse: collapse;\n",
+       "  }\n",
+       "  th, td {\n",
+       "    padding: 5px;\n",
+       "  }\n",
+       "  th {\n",
+       "    text-align: left;\n",
+       "  }\n",
+       "</style><div class='table-result-container'><table class='table-result'><thead style='background-color: white'><tr><th>ProductID</th><th>Category</th><th>Sub-Category</th><th>ProductName</th><th>State</th><th>Price_per_product</th></tr></thead><tbody><tr><td>FUR-CH-10002961</td><td>Furniture</td><td>Chairs</td><td>Leather Task Chair, Black</td><td>New York</td><td>81.882</td></tr><tr><td>TEC-AC-10004659</td><td>Technology</td><td>Accessories</td><td>Imation Secure+ Hardware Encrypted USB 2.0 Flash Drive; 16GB</td><td>Oklahoma</td><td>72.99</td></tr><tr><td>OFF-BI-10002824</td><td>Office Supplies</td><td>Binders</td><td>Recycled Easel Ring Binders</td><td>Colorado</td><td>4.25</td></tr><tr><td>OFF-PA-10003349</td><td>Office Supplies</td><td>Paper</td><td>Xerox 1957</td><td>Florida</td><td>5.184</td></tr><tr><td>TEC-AC-10003023</td><td>Technology</td><td>Accessories</td><td>Logitech G105 Gaming Keyboard</td><td>Ohio</td><td>47.496</td></tr></tbody></table></div>"
+      ]
+     },
+     "metadata": {
+      "application/vnd.databricks.v1+output": {
+       "addedWidgets": {},
+       "aggData": [],
+       "aggError": "",
+       "aggOverflow": false,
+       "aggSchema": [],
+       "aggSeriesLimitReached": false,
+       "aggType": "",
+       "arguments": {},
+       "columnCustomDisplayInfos": {},
+       "data": [
+        [
+         "FUR-CH-10002961",
+         "Furniture",
+         "Chairs",
+         "Leather Task Chair, Black",
+         "New York",
+         "81.882"
+        ],
+        [
+         "TEC-AC-10004659",
+         "Technology",
+         "Accessories",
+         "Imation Secure+ Hardware Encrypted USB 2.0 Flash Drive; 16GB",
+         "Oklahoma",
+         "72.99"
+        ],
+        [
+         "OFF-BI-10002824",
+         "Office Supplies",
+         "Binders",
+         "Recycled Easel Ring Binders",
+         "Colorado",
+         "4.25"
+        ],
+        [
+         "OFF-PA-10003349",
+         "Office Supplies",
+         "Paper",
+         "Xerox 1957",
+         "Florida",
+         "5.184"
+        ],
+        [
+         "TEC-AC-10003023",
+         "Technology",
+         "Accessories",
+         "Logitech G105 Gaming Keyboard",
+         "Ohio",
+         "47.496"
+        ]
+       ],
+       "datasetInfos": [],
+       "dbfsResultPath": null,
+       "isJsonSchema": true,
+       "metadata": {
+        "dataframeName": "_sqldf",
+        "executionCount": 348
+       },
+       "overflow": false,
+       "plotOptions": {
+        "customPlotOptions": {},
+        "displayType": "table",
+        "pivotAggregation": null,
+        "pivotColumns": null,
+        "xColumns": null,
+        "yColumns": null
+       },
+       "removedWidgets": [],
+       "schema": [
+        {
+         "metadata": "{}",
+         "name": "ProductID",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "Category",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "Sub-Category",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "ProductName",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "State",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "Price_per_product",
+         "type": "\"string\""
+        }
+       ],
+       "type": "table"
+      }
+     },
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "%sql\n",
+    "select * from pei.Raw_product limit 5"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 0,
+   "metadata": {
+    "application/vnd.databricks.v1+cell": {
+     "cellMetadata": {
+      "byteLimit": 2048000,
+      "rowLimit": 10000
+     },
+     "inputWidgets": {},
+     "nuid": "6e26a9bc-e87c-4c29-ba9a-300accd47d82",
+     "showTitle": false,
+     "title": ""
+    }
+   },
+   "outputs": [],
+   "source": [
+    "df=spark.sql('''select distinct o.*, p.Category, p.`Sub-Category`,p.ProductName,p.State,p.Price_per_product from pei.raw_order o  left join pei.raw_product p on o.ProductID=p.ProductID\n",
+    "order by o.CustomerID''')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 0,
+   "metadata": {
+    "application/vnd.databricks.v1+cell": {
+     "cellMetadata": {
+      "byteLimit": 2048000,
+      "rowLimit": 10000
+     },
+     "inputWidgets": {},
+     "nuid": "8d8041d4-bcde-4bb1-bfa8-16364ee68efd",
+     "showTitle": false,
+     "title": ""
+    }
+   },
+   "outputs": [],
+   "source": [
+    "df.write.saveAsTable('PEI.ProductOrdered')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 0,
+   "metadata": {
+    "application/vnd.databricks.v1+cell": {
+     "cellMetadata": {
+      "byteLimit": 2048000,
+      "implicitDf": true,
+      "rowLimit": 10000
+     },
+     "inputWidgets": {},
+     "nuid": "ac7dfae4-be0d-41d1-9751-3b167ad69118",
+     "showTitle": false,
+     "title": ""
+    }
+   },
+   "outputs": [
+    {
+     "output_type": "display_data",
+     "data": {
+      "text/html": [
+       "<style scoped>\n",
+       "  .table-result-container {\n",
+       "    max-height: 300px;\n",
+       "    overflow: auto;\n",
+       "  }\n",
+       "  table, th, td {\n",
+       "    border: 1px solid black;\n",
+       "    border-collapse: collapse;\n",
+       "  }\n",
+       "  th, td {\n",
+       "    padding: 5px;\n",
+       "  }\n",
+       "  th {\n",
+       "    text-align: left;\n",
+       "  }\n",
+       "</style><div class='table-result-container'><table class='table-result'><thead style='background-color: white'><tr><th>CustomerID</th><th>Discount</th><th>OrderDate</th><th>OrderID</th><th>Price</th><th>ProductID</th><th>Profit</th><th>Quantity</th><th>RowID</th><th>ShipDate</th><th>ShipMode</th><th>Category</th><th>Sub-Category</th><th>ProductName</th><th>State</th><th>Price_per_product</th></tr></thead><tbody><tr><td>AA-10315</td><td>0.2</td><td>2016-03-03</td><td>CA-2016-103982</td><td>41.72</td><td>TEC-AC-10002857</td><td>5.7365</td><td>7</td><td>2273</td><td>8/3/2016</td><td>Standard Class</td><td>Technology</td><td>Accessories</td><td>Verbatim 25 GB 6x Blu-ray Single Layer Recordable Disc, 1/Pack</td><td>Texas</td><td>5.96</td></tr><tr><td>AA-10315</td><td>0.0</td><td>2017-06-29</td><td>CA-2017-147039</td><td>362.94</td><td>OFF-AP-10000576</td><td>90.735</td><td>3</td><td>2024</td><td>4/7/2017</td><td>Standard Class</td><td>Office Supplies</td><td>Appliances</td><td>Belkin 325VA UPS Surge Protector, 6'</td><td>Florida</td><td>96.75</td></tr><tr><td>AA-10315</td><td>0.0</td><td>2014-03-31</td><td>CA-2014-128055</td><td>52.98</td><td>OFF-AP-10002765</td><td>14.8344</td><td>2</td><td>7528</td><td>5/4/2014</td><td>Standard Class</td><td>Office Supplies</td><td>Appliances</td><td>Fellowes Advanced Computer Series Surge Protectors</td><td>New Jersey</td><td>26.49</td></tr><tr><td>AA-10315</td><td>0.0</td><td>2015-10-04</td><td>CA-2015-121391</td><td>26.96</td><td>OFF-ST-10001590</td><td>7.0</td><td>2</td><td>8011</td><td>7/10/2015</td><td>First Class</td><td>Office Supplies</td><td>Storage</td><td>Tenex Personal Project File with Scoop Front Design, Black</td><td>Indiana</td><td>13.48</td></tr><tr><td>AA-10315</td><td>0.0</td><td>2017-06-29</td><td>CA-2017-147039</td><td>362.94</td><td>OFF-AP-10000576</td><td>90.735</td><td>3</td><td>2024</td><td>4/7/2017</td><td>Standard Class</td><td>Office Supplies</td><td>Appliances</td><td>Belkin 7 Outlet SurgeMaster II</td><td>Washington</td><td>39.48</td></tr></tbody></table></div>"
+      ]
+     },
+     "metadata": {
+      "application/vnd.databricks.v1+output": {
+       "addedWidgets": {},
+       "aggData": [],
+       "aggError": "",
+       "aggOverflow": false,
+       "aggSchema": [],
+       "aggSeriesLimitReached": false,
+       "aggType": "",
+       "arguments": {},
+       "columnCustomDisplayInfos": {},
+       "data": [
+        [
+         "AA-10315",
+         0.2,
+         "2016-03-03",
+         "CA-2016-103982",
+         "41.72",
+         "TEC-AC-10002857",
+         5.7365,
+         7,
+         2273,
+         "8/3/2016",
+         "Standard Class",
+         "Technology",
+         "Accessories",
+         "Verbatim 25 GB 6x Blu-ray Single Layer Recordable Disc, 1/Pack",
+         "Texas",
+         "5.96"
+        ],
+        [
+         "AA-10315",
+         0.0,
+         "2017-06-29",
+         "CA-2017-147039",
+         "362.94",
+         "OFF-AP-10000576",
+         90.735,
+         3,
+         2024,
+         "4/7/2017",
+         "Standard Class",
+         "Office Supplies",
+         "Appliances",
+         "Belkin 325VA UPS Surge Protector, 6'",
+         "Florida",
+         "96.75"
+        ],
+        [
+         "AA-10315",
+         0.0,
+         "2014-03-31",
+         "CA-2014-128055",
+         "52.98",
+         "OFF-AP-10002765",
+         14.8344,
+         2,
+         7528,
+         "5/4/2014",
+         "Standard Class",
+         "Office Supplies",
+         "Appliances",
+         "Fellowes Advanced Computer Series Surge Protectors",
+         "New Jersey",
+         "26.49"
+        ],
+        [
+         "AA-10315",
+         0.0,
+         "2015-10-04",
+         "CA-2015-121391",
+         "26.96",
+         "OFF-ST-10001590",
+         7.0,
+         2,
+         8011,
+         "7/10/2015",
+         "First Class",
+         "Office Supplies",
+         "Storage",
+         "Tenex Personal Project File with Scoop Front Design, Black",
+         "Indiana",
+         "13.48"
+        ],
+        [
+         "AA-10315",
+         0.0,
+         "2017-06-29",
+         "CA-2017-147039",
+         "362.94",
+         "OFF-AP-10000576",
+         90.735,
+         3,
+         2024,
+         "4/7/2017",
+         "Standard Class",
+         "Office Supplies",
+         "Appliances",
+         "Belkin 7 Outlet SurgeMaster II",
+         "Washington",
+         "39.48"
+        ]
+       ],
+       "datasetInfos": [],
+       "dbfsResultPath": null,
+       "isJsonSchema": true,
+       "metadata": {
+        "dataframeName": "_sqldf",
+        "executionCount": 349
+       },
+       "overflow": false,
+       "plotOptions": {
+        "customPlotOptions": {},
+        "displayType": "table",
+        "pivotAggregation": null,
+        "pivotColumns": null,
+        "xColumns": null,
+        "yColumns": null
+       },
+       "removedWidgets": [],
+       "schema": [
+        {
+         "metadata": "{}",
+         "name": "CustomerID",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "Discount",
+         "type": "\"double\""
+        },
+        {
+         "metadata": "{}",
+         "name": "OrderDate",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "OrderID",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "Price",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "ProductID",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "Profit",
+         "type": "\"double\""
+        },
+        {
+         "metadata": "{}",
+         "name": "Quantity",
+         "type": "\"long\""
+        },
+        {
+         "metadata": "{}",
+         "name": "RowID",
+         "type": "\"long\""
+        },
+        {
+         "metadata": "{}",
+         "name": "ShipDate",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "ShipMode",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "Category",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "Sub-Category",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "ProductName",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "State",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "Price_per_product",
+         "type": "\"string\""
+        }
+       ],
+       "type": "table"
+      }
+     },
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "%sql\n",
+    "select * from  PEI.ProductOrdered limit 5"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 0,
+   "metadata": {
+    "application/vnd.databricks.v1+cell": {
+     "cellMetadata": {
+      "byteLimit": 2048000,
+      "rowLimit": 10000
+     },
+     "inputWidgets": {},
+     "nuid": "c0f693df-940c-4120-9107-840707db90e1",
+     "showTitle": false,
+     "title": ""
+    }
+   },
+   "outputs": [],
+   "source": [
+    "df_enrich=spark.sql('''\n",
+    "select distinct c.CustomerName,c.Country,round(o.Profit,2) as Profit, p.Category, p.`Sub-Category` from pei.raw_order o  inner join pei.raw_product p on o.ProductID=p.ProductID\n",
+    "inner join pei.raw_customer c on o.CustomerID=c.CustomerID where c.CustomerName is not null\n",
+    "order by c.CustomerName''')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 0,
+   "metadata": {
+    "application/vnd.databricks.v1+cell": {
+     "cellMetadata": {
+      "byteLimit": 2048000,
+      "rowLimit": 10000
+     },
+     "inputWidgets": {},
+     "nuid": "8f77e3d1-840b-4622-9472-e2caf2b6f94c",
+     "showTitle": false,
+     "title": ""
+    }
+   },
+   "outputs": [],
+   "source": [
+    "df_enrich.write.saveAsTable('PEI.CustomerOrderProfit')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 0,
+   "metadata": {
+    "application/vnd.databricks.v1+cell": {
+     "cellMetadata": {
+      "byteLimit": 2048000,
+      "rowLimit": 10000
+     },
+     "inputWidgets": {},
+     "nuid": "0b587eda-6822-4747-93e1-30b45888738b",
+     "showTitle": false,
+     "title": ""
+    }
+   },
+   "outputs": [],
+   "source": [
+    "df_avg_table=spark.sql('''SELECT Year(OrderDate) as year, round(avg(profit),2) AS AverageProfit , round(min(profit),2) AS MinProfit,round(max(profit),2) as MaxProfit, round(sum(profit),2) as TotalProfit,Category ,`Sub-Category`,customerId \n",
+    "FROM pei.productordered  \n",
+    "GROUP BY  Year(OrderDate),`Sub-Category`,Category,customerId  ORDER BY Year(OrderDate),Category,`Sub-Category`,customerId; \n",
+    "\n",
+    "''')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 0,
+   "metadata": {
+    "application/vnd.databricks.v1+cell": {
+     "cellMetadata": {
+      "byteLimit": 2048000,
+      "rowLimit": 10000
+     },
+     "inputWidgets": {},
+     "nuid": "2797c57c-78dc-49a1-b70b-ee4e6ad84ad3",
+     "showTitle": false,
+     "title": ""
+    }
+   },
+   "outputs": [],
+   "source": [
+    "df_avg_table.write.saveAsTable('PEI.AggProfit')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 0,
+   "metadata": {
+    "application/vnd.databricks.v1+cell": {
+     "cellMetadata": {
+      "byteLimit": 2048000,
+      "implicitDf": true,
+      "rowLimit": 10000
+     },
+     "inputWidgets": {},
+     "nuid": "fcb026ca-e984-457a-b92c-bc2728566624",
+     "showTitle": false,
+     "title": ""
+    }
+   },
+   "outputs": [
+    {
+     "output_type": "display_data",
+     "data": {
+      "text/html": [
+       "<style scoped>\n",
+       "  .table-result-container {\n",
+       "    max-height: 300px;\n",
+       "    overflow: auto;\n",
+       "  }\n",
+       "  table, th, td {\n",
+       "    border: 1px solid black;\n",
+       "    border-collapse: collapse;\n",
+       "  }\n",
+       "  th, td {\n",
+       "    padding: 5px;\n",
+       "  }\n",
+       "  th {\n",
+       "    text-align: left;\n",
+       "  }\n",
+       "</style><div class='table-result-container'><table class='table-result'><thead style='background-color: white'><tr><th>year</th><th>AverageProfit</th><th>MinProfit</th><th>MaxProfit</th><th>TotalProfit</th><th>Category</th><th>Sub-Category</th><th>customerId</th></tr></thead><tbody><tr><td>2014</td><td>7.0</td><td>7.0</td><td>7.0</td><td>7.0</td><td>null</td><td>null</td><td>AA-10315</td></tr><tr><td>2014</td><td>121.44</td><td>121.44</td><td>121.44</td><td>121.44</td><td>null</td><td>null</td><td>AH-10030</td></tr><tr><td>2014</td><td>-57.3</td><td>-120.37</td><td>5.77</td><td>-114.6</td><td>null</td><td>null</td><td>BK-11260</td></tr><tr><td>2014</td><td>3.95</td><td>3.95</td><td>3.95</td><td>3.95</td><td>null</td><td>null</td><td>BS-11380</td></tr><tr><td>2014</td><td>4.14</td><td>3.0</td><td>5.8</td><td>12.42</td><td>null</td><td>null</td><td>CD-12790</td></tr></tbody></table></div>"
+      ]
+     },
+     "metadata": {
+      "application/vnd.databricks.v1+output": {
+       "addedWidgets": {},
+       "aggData": [],
+       "aggError": "",
+       "aggOverflow": false,
+       "aggSchema": [],
+       "aggSeriesLimitReached": false,
+       "aggType": "",
+       "arguments": {},
+       "columnCustomDisplayInfos": {},
+       "data": [
+        [
+         2014,
+         7.0,
+         7.0,
+         7.0,
+         7.0,
+         null,
+         null,
+         "AA-10315"
+        ],
+        [
+         2014,
+         121.44,
+         121.44,
+         121.44,
+         121.44,
+         null,
+         null,
+         "AH-10030"
+        ],
+        [
+         2014,
+         -57.3,
+         -120.37,
+         5.77,
+         -114.6,
+         null,
+         null,
+         "BK-11260"
+        ],
+        [
+         2014,
+         3.95,
+         3.95,
+         3.95,
+         3.95,
+         null,
+         null,
+         "BS-11380"
+        ],
+        [
+         2014,
+         4.14,
+         3.0,
+         5.8,
+         12.42,
+         null,
+         null,
+         "CD-12790"
+        ]
+       ],
+       "datasetInfos": [],
+       "dbfsResultPath": null,
+       "isJsonSchema": true,
+       "metadata": {
+        "dataframeName": "_sqldf",
+        "executionCount": 350
+       },
+       "overflow": false,
+       "plotOptions": {
+        "customPlotOptions": {},
+        "displayType": "table",
+        "pivotAggregation": null,
+        "pivotColumns": null,
+        "xColumns": null,
+        "yColumns": null
+       },
+       "removedWidgets": [],
+       "schema": [
+        {
+         "metadata": "{}",
+         "name": "year",
+         "type": "\"integer\""
+        },
+        {
+         "metadata": "{}",
+         "name": "AverageProfit",
+         "type": "\"double\""
+        },
+        {
+         "metadata": "{}",
+         "name": "MinProfit",
+         "type": "\"double\""
+        },
+        {
+         "metadata": "{}",
+         "name": "MaxProfit",
+         "type": "\"double\""
+        },
+        {
+         "metadata": "{}",
+         "name": "TotalProfit",
+         "type": "\"double\""
+        },
+        {
+         "metadata": "{}",
+         "name": "Category",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "Sub-Category",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "customerId",
+         "type": "\"string\""
+        }
+       ],
+       "type": "table"
+      }
+     },
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "\n",
+    "%sql\n",
+    "select * from pei.AggProfit limit 5"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 0,
+   "metadata": {
+    "application/vnd.databricks.v1+cell": {
+     "cellMetadata": {
+      "byteLimit": 2048000,
+      "implicitDf": true,
+      "rowLimit": 10000
+     },
+     "inputWidgets": {},
+     "nuid": "0a537d6a-cbdd-4ed5-915e-6b22ba65181a",
+     "showTitle": false,
+     "title": ""
+    }
+   },
+   "outputs": [
+    {
+     "output_type": "display_data",
+     "data": {
+      "text/html": [
+       "<style scoped>\n",
+       "  .table-result-container {\n",
+       "    max-height: 300px;\n",
+       "    overflow: auto;\n",
+       "  }\n",
+       "  table, th, td {\n",
+       "    border: 1px solid black;\n",
+       "    border-collapse: collapse;\n",
+       "  }\n",
+       "  th, td {\n",
+       "    padding: 5px;\n",
+       "  }\n",
+       "  th {\n",
+       "    text-align: left;\n",
+       "  }\n",
+       "</style><div class='table-result-container'><table class='table-result'><thead style='background-color: white'><tr><th>year</th><th>total_pofit</th></tr></thead><tbody><tr><td>2015</td><td>66289.53</td></tr><tr><td>2014</td><td>41498.55</td></tr><tr><td>2016</td><td>68565.77</td></tr><tr><td>2017</td><td>127664.0</td></tr></tbody></table></div>"
+      ]
+     },
+     "metadata": {
+      "application/vnd.databricks.v1+output": {
+       "addedWidgets": {},
+       "aggData": [],
+       "aggError": "",
+       "aggOverflow": false,
+       "aggSchema": [],
+       "aggSeriesLimitReached": false,
+       "aggType": "",
+       "arguments": {},
+       "columnCustomDisplayInfos": {},
+       "data": [
+        [
+         2015,
+         66289.53
+        ],
+        [
+         2014,
+         41498.55
+        ],
+        [
+         2016,
+         68565.77
+        ],
+        [
+         2017,
+         127664.0
+        ]
+       ],
+       "datasetInfos": [],
+       "dbfsResultPath": null,
+       "isJsonSchema": true,
+       "metadata": {
+        "dataframeName": "_sqldf",
+        "executionCount": 339
+       },
+       "overflow": false,
+       "plotOptions": {
+        "customPlotOptions": {},
+        "displayType": "table",
+        "pivotAggregation": null,
+        "pivotColumns": null,
+        "xColumns": null,
+        "yColumns": null
+       },
+       "removedWidgets": [],
+       "schema": [
+        {
+         "metadata": "{}",
+         "name": "year",
+         "type": "\"integer\""
+        },
+        {
+         "metadata": "{}",
+         "name": "total_pofit",
+         "type": "\"double\""
+        }
+       ],
+       "type": "table"
+      }
+     },
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "%sql\n",
+    "--total profit per year\n",
+    "select year,round(sum(totalprofit),2) as total_pofit from pei.Aggprofit group by year"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 0,
+   "metadata": {
+    "application/vnd.databricks.v1+cell": {
+     "cellMetadata": {
+      "byteLimit": 2048000,
+      "implicitDf": true,
+      "rowLimit": 10000
+     },
+     "inputWidgets": {},
+     "nuid": "90bcfc04-0900-4de2-ac2d-99def367c06f",
+     "showTitle": false,
+     "title": ""
+    }
+   },
+   "outputs": [
+    {
+     "output_type": "display_data",
+     "data": {
+      "text/html": [
+       "<style scoped>\n",
+       "  .table-result-container {\n",
+       "    max-height: 300px;\n",
+       "    overflow: auto;\n",
+       "  }\n",
+       "  table, th, td {\n",
+       "    border: 1px solid black;\n",
+       "    border-collapse: collapse;\n",
+       "  }\n",
+       "  th, td {\n",
+       "    padding: 5px;\n",
+       "  }\n",
+       "  th {\n",
+       "    text-align: left;\n",
+       "  }\n",
+       "</style><div class='table-result-container'><table class='table-result'><thead style='background-color: white'><tr><th>year</th><th>category</th><th>total_pofit</th></tr></thead><tbody><tr><td>2014</td><td>null</td><td>523.12</td></tr><tr><td>2014</td><td>Furniture</td><td>-5174.720000000001</td></tr><tr><td>2014</td><td>Office Supplies</td><td>22663.910000000003</td></tr><tr><td>2014</td><td>Technology</td><td>23486.239999999998</td></tr><tr><td>2015</td><td>null</td><td>583.17</td></tr><tr><td>2015</td><td>Furniture</td><td>3392.119999999997</td></tr><tr><td>2015</td><td>Office Supplies</td><td>25490.400000000023</td></tr><tr><td>2015</td><td>Technology</td><td>36823.84</td></tr><tr><td>2016</td><td>null</td><td>404.44999999999993</td></tr><tr><td>2016</td><td>Furniture</td><td>7750.209999999992</td></tr><tr><td>2016</td><td>Office Supplies</td><td>35973.67000000001</td></tr><tr><td>2016</td><td>Technology</td><td>24437.44000000002</td></tr><tr><td>2017</td><td>null</td><td>488.51000000000016</td></tr><tr><td>2017</td><td>Furniture</td><td>3361.7699999999923</td></tr><tr><td>2017</td><td>Office Supplies</td><td>45330.62000000008</td></tr><tr><td>2017</td><td>Technology</td><td>78483.09999999998</td></tr></tbody></table></div>"
+      ]
+     },
+     "metadata": {
+      "application/vnd.databricks.v1+output": {
+       "addedWidgets": {},
+       "aggData": [],
+       "aggError": "",
+       "aggOverflow": false,
+       "aggSchema": [],
+       "aggSeriesLimitReached": false,
+       "aggType": "",
+       "arguments": {},
+       "columnCustomDisplayInfos": {},
+       "data": [
+        [
+         2014,
+         null,
+         523.12
+        ],
+        [
+         2014,
+         "Furniture",
+         -5174.720000000001
+        ],
+        [
+         2014,
+         "Office Supplies",
+         22663.910000000003
+        ],
+        [
+         2014,
+         "Technology",
+         23486.239999999998
+        ],
+        [
+         2015,
+         null,
+         583.17
+        ],
+        [
+         2015,
+         "Furniture",
+         3392.119999999997
+        ],
+        [
+         2015,
+         "Office Supplies",
+         25490.400000000023
+        ],
+        [
+         2015,
+         "Technology",
+         36823.84
+        ],
+        [
+         2016,
+         null,
+         404.44999999999993
+        ],
+        [
+         2016,
+         "Furniture",
+         7750.209999999992
+        ],
+        [
+         2016,
+         "Office Supplies",
+         35973.67000000001
+        ],
+        [
+         2016,
+         "Technology",
+         24437.44000000002
+        ],
+        [
+         2017,
+         null,
+         488.51000000000016
+        ],
+        [
+         2017,
+         "Furniture",
+         3361.7699999999923
+        ],
+        [
+         2017,
+         "Office Supplies",
+         45330.62000000008
+        ],
+        [
+         2017,
+         "Technology",
+         78483.09999999998
+        ]
+       ],
+       "datasetInfos": [],
+       "dbfsResultPath": null,
+       "isJsonSchema": true,
+       "metadata": {
+        "dataframeName": "_sqldf",
+        "executionCount": 340
+       },
+       "overflow": false,
+       "plotOptions": {
+        "customPlotOptions": {},
+        "displayType": "table",
+        "pivotAggregation": null,
+        "pivotColumns": null,
+        "xColumns": null,
+        "yColumns": null
+       },
+       "removedWidgets": [],
+       "schema": [
+        {
+         "metadata": "{}",
+         "name": "year",
+         "type": "\"integer\""
+        },
+        {
+         "metadata": "{}",
+         "name": "category",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "total_pofit",
+         "type": "\"double\""
+        }
+       ],
+       "type": "table"
+      }
+     },
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "%sql\n",
+    "--profit per year+ plus category \n",
+    "select year,category,sum(totalprofit) as total_pofit from pei.Aggprofit group by year,Category order by year,Category\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 0,
+   "metadata": {
+    "application/vnd.databricks.v1+cell": {
+     "cellMetadata": {
+      "byteLimit": 2048000,
+      "implicitDf": true,
+      "rowLimit": 10000
+     },
+     "inputWidgets": {},
+     "nuid": "52495874-9fdd-4195-995c-3f30f1c77f5f",
+     "showTitle": false,
+     "title": ""
+    }
+   },
+   "outputs": [
+    {
+     "output_type": "display_data",
+     "data": {
+      "text/html": [
+       "<style scoped>\n",
+       "  .table-result-container {\n",
+       "    max-height: 300px;\n",
+       "    overflow: auto;\n",
+       "  }\n",
+       "  table, th, td {\n",
+       "    border: 1px solid black;\n",
+       "    border-collapse: collapse;\n",
+       "  }\n",
+       "  th, td {\n",
+       "    padding: 5px;\n",
+       "  }\n",
+       "  th {\n",
+       "    text-align: left;\n",
+       "  }\n",
+       "</style><div class='table-result-container'><table class='table-result'><thead style='background-color: white'><tr><th>customerId</th><th>total_pofit</th></tr></thead><tbody><tr><td>AA-10315</td><td>-266.4</td></tr><tr><td>AA-10375</td><td>277.4</td></tr><tr><td>AA-10480</td><td>445.96</td></tr><tr><td>AA-10645</td><td>857.8</td></tr><tr><td>AB-10015</td><td>129.67</td></tr></tbody></table></div>"
+      ]
+     },
+     "metadata": {
+      "application/vnd.databricks.v1+output": {
+       "addedWidgets": {},
+       "aggData": [],
+       "aggError": "",
+       "aggOverflow": false,
+       "aggSchema": [],
+       "aggSeriesLimitReached": false,
+       "aggType": "",
+       "arguments": {},
+       "columnCustomDisplayInfos": {},
+       "data": [
+        [
+         "AA-10315",
+         -266.4
+        ],
+        [
+         "AA-10375",
+         277.4
+        ],
+        [
+         "AA-10480",
+         445.96
+        ],
+        [
+         "AA-10645",
+         857.8
+        ],
+        [
+         "AB-10015",
+         129.67
+        ]
+       ],
+       "datasetInfos": [],
+       "dbfsResultPath": null,
+       "isJsonSchema": true,
+       "metadata": {
+        "dataframeName": "_sqldf",
+        "executionCount": 351
+       },
+       "overflow": false,
+       "plotOptions": {
+        "customPlotOptions": {},
+        "displayType": "table",
+        "pivotAggregation": null,
+        "pivotColumns": null,
+        "xColumns": null,
+        "yColumns": null
+       },
+       "removedWidgets": [],
+       "schema": [
+        {
+         "metadata": "{}",
+         "name": "customerId",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "total_pofit",
+         "type": "\"double\""
+        }
+       ],
+       "type": "table"
+      }
+     },
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "%sql\n",
+    "--profit per customer\n",
+    "select customerId,round(sum(totalprofit),2) as total_pofit from pei.Aggprofit a group by customerId order by customerId limit 5"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 0,
+   "metadata": {
+    "application/vnd.databricks.v1+cell": {
+     "cellMetadata": {
+      "byteLimit": 2048000,
+      "implicitDf": true,
+      "rowLimit": 10000
+     },
+     "inputWidgets": {},
+     "nuid": "7ddc6cc9-268c-4d8d-9d83-7a9c94ec2a10",
+     "showTitle": false,
+     "title": ""
+    }
+   },
+   "outputs": [
+    {
+     "output_type": "display_data",
+     "data": {
+      "text/html": [
+       "<style scoped>\n",
+       "  .table-result-container {\n",
+       "    max-height: 300px;\n",
+       "    overflow: auto;\n",
+       "  }\n",
+       "  table, th, td {\n",
+       "    border: 1px solid black;\n",
+       "    border-collapse: collapse;\n",
+       "  }\n",
+       "  th, td {\n",
+       "    padding: 5px;\n",
+       "  }\n",
+       "  th {\n",
+       "    text-align: left;\n",
+       "  }\n",
+       "</style><div class='table-result-container'><table class='table-result'><thead style='background-color: white'><tr><th>customerId</th><th>year</th><th>total_pofit</th></tr></thead><tbody><tr><td>AA-10315</td><td>2014</td><td>280.68</td></tr><tr><td>AA-10315</td><td>2016</td><td>-747.09</td></tr><tr><td>AA-10315</td><td>2015</td><td>7.0</td></tr><tr><td>AA-10315</td><td>2017</td><td>193.01</td></tr><tr><td>AA-10375</td><td>2014</td><td>16.71</td></tr></tbody></table></div>"
+      ]
+     },
+     "metadata": {
+      "application/vnd.databricks.v1+output": {
+       "addedWidgets": {},
+       "aggData": [],
+       "aggError": "",
+       "aggOverflow": false,
+       "aggSchema": [],
+       "aggSeriesLimitReached": false,
+       "aggType": "",
+       "arguments": {},
+       "columnCustomDisplayInfos": {},
+       "data": [
+        [
+         "AA-10315",
+         2014,
+         280.68
+        ],
+        [
+         "AA-10315",
+         2016,
+         -747.09
+        ],
+        [
+         "AA-10315",
+         2015,
+         7.0
+        ],
+        [
+         "AA-10315",
+         2017,
+         193.01
+        ],
+        [
+         "AA-10375",
+         2014,
+         16.71
+        ]
+       ],
+       "datasetInfos": [],
+       "dbfsResultPath": null,
+       "isJsonSchema": true,
+       "metadata": {
+        "dataframeName": "_sqldf",
+        "executionCount": 352
+       },
+       "overflow": false,
+       "plotOptions": {
+        "customPlotOptions": {},
+        "displayType": "table",
+        "pivotAggregation": null,
+        "pivotColumns": null,
+        "xColumns": null,
+        "yColumns": null
+       },
+       "removedWidgets": [],
+       "schema": [
+        {
+         "metadata": "{}",
+         "name": "customerId",
+         "type": "\"string\""
+        },
+        {
+         "metadata": "{}",
+         "name": "year",
+         "type": "\"integer\""
+        },
+        {
+         "metadata": "{}",
+         "name": "total_pofit",
+         "type": "\"double\""
+        }
+       ],
+       "type": "table"
+      }
+     },
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "%sql\n",
+    "--profit customer per year\n",
+    "select customerId,year,round(sum(totalprofit),2) as total_pofit from pei.Aggprofit a group by customerId,year order by customerId limit 5"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 0,
+   "metadata": {
+    "application/vnd.databricks.v1+cell": {
+     "cellMetadata": {},
+     "inputWidgets": {},
+     "nuid": "5b422286-d0d6-4605-b851-e529f1660ebd",
+     "showTitle": false,
+     "title": ""
+    }
+   },
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "application/vnd.databricks.v1+notebook": {
+   "dashboards": [],
+   "language": "python",
+   "notebookMetadata": {
+    "mostRecentlyExecutedCommandWithImplicitDF": {
+     "commandId": 163036146476568,
+     "dataframes": [
+      "_sqldf"
+     ]
+    },
+    "pythonIndentUnit": 4
+   },
+   "notebookName": "PEI",
+   "widgets": {}
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 0
+}
